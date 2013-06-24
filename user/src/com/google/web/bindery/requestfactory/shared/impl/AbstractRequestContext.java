@@ -895,8 +895,10 @@ public abstract class AbstractRequestContext implements RequestContext, EntityCo
           useDelta ? AutoBeanUtils.diff(parent, proxyBean) : AutoBeanUtils
               .getAllProperties(proxyBean);
     } else if (isValueType(stableId.getProxyClass())) {
-      // Send everything
-      diff = AutoBeanUtils.getAllProperties(proxyBean);
+      // Send everything if has no parent object or parent diff is not empty
+      final AutoBean<?> valueParent = proxyBean.getTag(Constants.PARENT_OBJECT);
+      final boolean equals = valueParent != null && AutoBeanUtils.diff(valueParent, proxyBean).isEmpty();
+      diff = equals ? Collections.<String, Object>emptyMap() : AutoBeanUtils.getAllProperties(proxyBean);
     }
 
     if (!diff.isEmpty()) {
