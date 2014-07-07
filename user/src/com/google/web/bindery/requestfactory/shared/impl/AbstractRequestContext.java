@@ -17,6 +17,8 @@ import static com.google.web.bindery.requestfactory.shared.impl.BaseProxyCategor
 import static com.google.web.bindery.requestfactory.shared.impl.Constants.REQUEST_CONTEXT_STATE;
 import static com.google.web.bindery.requestfactory.shared.impl.Constants.STABLE_ID;
 
+import com.google.gwt.core.client.Scheduler;
+import com.google.gwt.core.shared.GWT;
 import com.google.web.bindery.autobean.shared.AutoBean;
 import com.google.web.bindery.autobean.shared.AutoBeanCodex;
 import com.google.web.bindery.autobean.shared.AutoBeanFactory;
@@ -346,7 +348,7 @@ public abstract class AbstractRequestContext implements RequestContext, EntityCo
     }
 
     public void processPayload(final Receiver<Void> receiver, String payload) {
-      ResponseMessage response =
+      final ResponseMessage response =
           AutoBeanCodex.decode(MessageFactoryHolder.FACTORY, ResponseMessage.class, payload).as();
       if (response.getGeneralFailure() != null) {
         ServerFailureMessage failure = response.getGeneralFailure();
@@ -370,48 +372,51 @@ public abstract class AbstractRequestContext implements RequestContext, EntityCo
       }
 
       // Process operations
-      processReturnOperations(response);
+      processReturnOperations(response, new Runnable() {
+        @Override
+        public void run() {
+          // Send return values
+          Set<Throwable> causes = null;
+          for (int i = 0, j = state.invocations.size(); i < j; i++) {
+            try {
+              if (response.getStatusCodes().get(i)) {
+                state.invocations.get(i).onSuccess(response.getInvocationResults().get(i));
+              } else {
+                ServerFailureMessage failure =
+                    AutoBeanCodex.decode(MessageFactoryHolder.FACTORY, ServerFailureMessage.class,
+                        response.getInvocationResults().get(i)).as();
+                state.invocations.get(i).onFail(
+                    new ServerFailure(failure.getMessage(), failure.getExceptionType(), failure
+                        .getStackTrace(), failure.isFatal()));
+              }
+            } catch (Throwable t) {
+              if (causes == null) {
+                causes = new HashSet<Throwable>();
+              }
+              causes.add(t);
+            }
+          }
 
-      // Send return values
-      Set<Throwable> causes = null;
-      for (int i = 0, j = state.invocations.size(); i < j; i++) {
-        try {
-          if (response.getStatusCodes().get(i)) {
-            state.invocations.get(i).onSuccess(response.getInvocationResults().get(i));
-          } else {
-            ServerFailureMessage failure =
-                AutoBeanCodex.decode(MessageFactoryHolder.FACTORY, ServerFailureMessage.class,
-                    response.getInvocationResults().get(i)).as();
-            state.invocations.get(i).onFail(
-                new ServerFailure(failure.getMessage(), failure.getExceptionType(), failure
-                    .getStackTrace(), failure.isFatal()));
+          if (receiver != null) {
+            try {
+              receiver.onSuccess(null);
+            } catch (Throwable t) {
+              if (causes == null) {
+                causes = new HashSet<Throwable>();
+              }
+              causes.add(t);
+            }
           }
-        } catch (Throwable t) {
-          if (causes == null) {
-            causes = new HashSet<Throwable>();
+          // After success, shut down the context
+          state.editedProxies.clear();
+          state.invocations.clear();
+          state.returnedProxies.clear();
+
+          if (causes != null) {
+            throw new UmbrellaException(causes);
           }
-          causes.add(t);
         }
-      }
-
-      if (receiver != null) {
-        try {
-          receiver.onSuccess(null);
-        } catch (Throwable t) {
-          if (causes == null) {
-            causes = new HashSet<Throwable>();
-          }
-          causes.add(t);
-        }
-      }
-      // After success, shut down the context
-      state.editedProxies.clear();
-      state.invocations.clear();
-      state.returnedProxies.clear();
-
-      if (causes != null) {
-        throw new UmbrellaException(causes);
-      }
+      });
     }
   }
 
@@ -1246,40 +1251,57 @@ public abstract class AbstractRequestContext implements RequestContext, EntityCo
   /**
    * Process an array of OperationMessages.
    */
-  private void processReturnOperations(ResponseMessage response) {
-    List<OperationMessage> ops = response.getOperations();
+  private void processReturnOperations(ResponseMessage response, final Runnable callback) {
+    final List<OperationMessage> ops = response.getOperations();
 
-    // If there are no observable effects, this will be null
+    // If there are no observable effects, ops will be null
     if (ops == null) {
+      callback.run();
       return;
     }
 
-    for (OperationMessage op : ops) {
-      SimpleProxyId<?> id = getId(op);
-      WriteOperation[] toPropagate = null;
+    final Iterator<OperationMessage> iterator = ops.iterator();
 
-      // May be null if the server is returning an unpersisted object
-      WriteOperation effect = op.getOperation();
-      if (effect != null) {
-        switch (effect) {
-          case DELETE:
-            toPropagate = DELETE_ONLY;
-            break;
-          case PERSIST:
-            toPropagate = PERSIST_AND_UPDATE;
-            break;
-          case UPDATE:
-            toPropagate = UPDATE_ONLY;
-            break;
-          default:
-            // Should never reach here
-            throw new RuntimeException(effect.toString());
+    final Scheduler.RepeatingCommand cmd = new Scheduler.RepeatingCommand() {
+      @Override
+      public boolean execute() {
+        if (iterator.hasNext()) {
+          final OperationMessage op = iterator.next();
+          SimpleProxyId<?> id = getId(op);
+          WriteOperation[] toPropagate = null;
+
+          // May be null if the server is returning an unpersisted object
+          WriteOperation effect = op.getOperation();
+          if (effect != null) {
+            switch (effect) {
+              case DELETE:
+                toPropagate = DELETE_ONLY;
+                break;
+              case PERSIST:
+                toPropagate = PERSIST_AND_UPDATE;
+                break;
+              case UPDATE:
+                toPropagate = UPDATE_ONLY;
+                break;
+              default:
+                // Should never reach here
+                throw new RuntimeException(effect.toString());
+            }
+          }
+          processReturnOperation(id, op, toPropagate);
+          return true;
+        } else {
+          assert state.returnedProxies.size() == ops.size();
+          callback.run();
+          return false;
         }
       }
-      processReturnOperation(id, op, toPropagate);
+    };
+    if (GWT.isClient()) {
+        Scheduler.get().scheduleIncremental(cmd);
+    } else {
+        while (cmd.execute());
     }
-
-    assert state.returnedProxies.size() == ops.size();
   }
 
   /**
