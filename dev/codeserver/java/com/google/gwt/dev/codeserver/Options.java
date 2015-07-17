@@ -92,7 +92,7 @@ public class Options {
   private boolean closureFormattedOutput = false;
   // Incremental superdevmod has different defaults than devmode and regular superdevmode; we use
   // null here means not set by the user (and the right default is computed by getOutput().
-  private JsOutputOption output = null;
+  JsOutputOption output = null;
 
   private final ListMultimap<String, String> properties = LinkedListMultimap.create();
 

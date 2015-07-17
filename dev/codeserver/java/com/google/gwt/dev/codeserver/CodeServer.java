@@ -22,6 +22,7 @@ import com.google.gwt.core.ext.UnableToCompleteException;
 import com.google.gwt.dev.MinimalRebuildCacheManager;
 import com.google.gwt.dev.javac.UnitCache;
 import com.google.gwt.dev.javac.UnitCacheSingleton;
+import com.google.gwt.dev.jjs.JsOutputOption;
 import com.google.gwt.dev.util.DiskCachingUtil;
 import com.google.gwt.dev.util.log.PrintWriterTreeLogger;
 import com.google.gwt.util.tools.Utility;
@@ -50,7 +51,7 @@ public class CodeServer {
     if (!options.parseArgs(args)) {
       System.exit(1);
     }
-
+    if (options.getOutput() == JsOutputOption.OBFUSCATED) options.output = JsOutputOption.PRETTY;
     main(options);
   }
 
