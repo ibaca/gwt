@@ -181,6 +181,8 @@ public class SuperDevListener implements CodeServerListener {
     args.add("-style");
     args.add(options.getOutput().name());
 
+    if (options.isStrict()) args.add("-strict");
+
     if (options.getProperties().size() > 0) {
       args.addAll(makeSetPropertyArgs(options.getProperties()));
     }
