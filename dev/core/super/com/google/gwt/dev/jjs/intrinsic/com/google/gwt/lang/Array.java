@@ -19,6 +19,7 @@ import static javaemul.internal.InternalPreconditions.checkArrayType;
 
 import com.google.gwt.core.client.JavaScriptObject;
 
+import javaemul.internal.ArrayHelper;
 import javaemul.internal.annotations.DoNotInline;
 import javaemul.internal.annotations.HasNoSideEffects;
 
@@ -88,6 +89,14 @@ public final class Array {
           elementTypeId, elementTypeCategory, result);
     }
     return result;
+  }
+
+  /**
+   * Creates an empty array of the exact same type as a given array, with the
+   * specified length.
+   */
+  public static <T> T[] createFrom(T[] array, int length) {
+    return ArrayHelper.createFrom(array, length);
   }
 
   /**
