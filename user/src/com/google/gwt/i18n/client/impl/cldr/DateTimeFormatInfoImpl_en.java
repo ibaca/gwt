@@ -63,7 +63,7 @@ public class DateTimeFormatInfoImpl_en extends DateTimeFormatInfoImpl {
 
   @Override
   public int firstDayOfTheWeek() {
-    return 0;
+    return 1;
   }
 
   @Override
