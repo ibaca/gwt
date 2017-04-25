@@ -106,6 +106,8 @@ public interface ConstantsWithLookup extends Constants {
    */
   String getString(String methodName) throws MissingResourceException;
 
+  String findString(String methodName);
+
   /**
    * Look up <code>String[]</code> by method name.
    * 
