@@ -28,6 +28,7 @@ import com.google.gwt.i18n.shared.GwtLocale;
 import com.google.gwt.user.rebind.AbstractMethodCreator;
 import com.google.gwt.user.rebind.SourceWriter;
 
+import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -127,15 +128,25 @@ class ConstantsWithLookupImplCreator extends ConstantsImplCreator {
           });
 
       // String
-      JType stringType = oracle.parse(String.class.getName());
-      LookupMethodCreator stringMethod = new LookupMethodCreator(this,
-          stringType) {
-        @Override
-        public String returnTemplate() {
-          return "String answer = {0}();\ncache.put(\"{0}\",answer);\nreturn answer;";
+      final JType stringType = oracle.parse(String.class.getName());
+      namesToMethodCreators.put("findString", new LookupMethodCreator(this, stringType) {
+        @Override public void createMethodFor(TreeLogger logger, JMethod targetMethod, String key, ResourceList resourceList, GwtLocale locale) {
+          println("switch (arg0) {"); indent();
+          for (JMethod method : allInterfaceMethods) {
+            if (method.getReturnType().equals(stringType) && !method.getName().matches("(get|find)String")) {
+              println("case " + wrap(method.getName()) + ": return "+ method.getName() +"();"); } }
+          println("default: return null;"); outdent();
+          println("}");
         }
-      };
-      namesToMethodCreators.put("getString", stringMethod);
+      });
+      namesToMethodCreators.put("getString", new LookupMethodCreator(this, null) {
+        @Override public void createMethodFor(TreeLogger logger, JMethod targetMethod, String key, ResourceList resourceList, GwtLocale locale) {
+          println("String target = findString(arg0);");
+          println("if (target != null) return target;");
+          String format = "throw new java.util.MissingResourceException(\"Cannot find constant ''\" + {0} + \"''; expecting a method name\", \"{1}\", {0});";
+          println(MessageFormat.format(format, "arg0", getTarget().getQualifiedSourceName()));
+        }
+      });
 
       // String Array
       JType stringArray = oracle.getArrayType(stringType);
