@@ -1777,7 +1777,7 @@ public class GwtAstBuilder {
       SourceInfo info = makeSourceInfo(x);
 
       // Get the method that the Type::method is actually referring to
-      MethodBinding referredMethodBinding = x.binding;
+      MethodBinding referredMethodBinding = x.getMethodBinding();
       if (referredMethodBinding instanceof SyntheticMethodBinding) {
         SyntheticMethodBinding synthRefMethodBinding =
             (SyntheticMethodBinding) referredMethodBinding;
