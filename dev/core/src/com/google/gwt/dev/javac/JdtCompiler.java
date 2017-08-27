@@ -738,6 +738,10 @@ public class JdtCompiler {
     options.complianceLevel = jdtSourceLevel;
     options.sourceLevel = jdtSourceLevel;
     options.targetJDK = jdtSourceLevel;
+
+    options.storeAnnotations = false;
+    options.docCommentSupport = false;
+    options.isAnnotationBasedNullAnalysisEnabled = false;
     return options;
   }
 
