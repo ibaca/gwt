@@ -25,54 +25,17 @@ import com.google.gwt.core.ext.typeinfo.TypeOracle;
 import com.google.gwt.core.ext.typeinfo.TypeOracleException;
 import com.google.gwt.i18n.rebind.AbstractResource.ResourceList;
 import com.google.gwt.i18n.shared.GwtLocale;
-import com.google.gwt.thirdparty.guava.common.collect.Lists;
+import com.google.gwt.user.rebind.AbstractMethodCreator;
 import com.google.gwt.user.rebind.SourceWriter;
 
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 class ConstantsWithLookupImplCreator extends ConstantsImplCreator {
-
-  /**
-   * Used partition size if no one is specified.
-   * 
-   * Used in constructor without a partition size.
-   */
-  private static final int DEFAULT_PARTITIONS_SIZE = 500;
-  
   final JMethod[] allInterfaceMethods;
 
-  private final Map<String, LookupMethodCreator> namesToMethodCreators = new HashMap<>();
-  
-  private final Map<JMethod, List<List<JMethod>>> neededPartitionLookups = new HashMap<>();
+  private final Map<String, AbstractMethodCreator> namesToMethodCreators = new HashMap<String, AbstractMethodCreator>();
 
-  private final int partitionsSize;
-
-  /**
-   * Constructor for <code>ConstantsWithLookupImplCreator</code>. The default partition size of
-   * {@value #DEFAULT_PARTITIONS_SIZE} is used.
-   * 
-   * @param logger logger to print errors
-   * @param writer <code>Writer</code> to print to
-   * @param localizableClass class/interface to conform to
-   * @param resourceList resource bundle used to generate the class
-   * @param oracle types
-   * @throws UnableToCompleteException
-   * 
-   * @see LookupMethodCreator#DEFAULT_PARTITIONS_SIZE
-   */
-  ConstantsWithLookupImplCreator(TreeLogger logger, SourceWriter writer,
-      JClassType localizableClass, ResourceList resourceList, TypeOracle oracle)
-      throws UnableToCompleteException {
-    this(logger, writer, localizableClass, resourceList, oracle, DEFAULT_PARTITIONS_SIZE);
-  }
-  
   /**
    * Constructor for <code>ConstantsWithLookupImplCreator</code>.
    * 
@@ -84,10 +47,9 @@ class ConstantsWithLookupImplCreator extends ConstantsImplCreator {
    * @throws UnableToCompleteException
    */
   ConstantsWithLookupImplCreator(TreeLogger logger, SourceWriter writer,
-      JClassType localizableClass, ResourceList resourceList, TypeOracle oracle, 
-      int partitionsSize) throws UnableToCompleteException {
+      JClassType localizableClass, ResourceList resourceList, TypeOracle oracle)
+      throws UnableToCompleteException {
     super(logger, writer, localizableClass, resourceList, oracle);
-    this.partitionsSize = partitionsSize;
     try {
 
       // Boolean
@@ -101,9 +63,7 @@ class ConstantsWithLookupImplCreator extends ConstantsImplCreator {
 
         @Override
         public String returnTemplate() {
-          return "boolean answer = {0}();\n"
-              + "cache.put(\"{0}\",new Boolean(answer));\n"
-              + "return answer;";
+          return "boolean answer = {0}();\ncache.put(\"{0}\",new Boolean(answer));\nreturn answer;";
         }
       };
       namesToMethodCreators.put("getBoolean", booleanMethod);
@@ -119,9 +79,7 @@ class ConstantsWithLookupImplCreator extends ConstantsImplCreator {
 
         @Override
         public String returnTemplate() {
-          return "double answer = {0}();\n"
-              + "cache.put(\"{0}\",new Double(answer));\n"
-              + "return answer;";
+          return "double answer = {0}();\ncache.put(\"{0}\",new Double(answer));\nreturn answer;";
         }
       };
       namesToMethodCreators.put("getDouble", doubleMethod);
@@ -136,9 +94,7 @@ class ConstantsWithLookupImplCreator extends ConstantsImplCreator {
 
         @Override
         public String returnTemplate() {
-          return "int answer = {0}();\n"
-              + "cache.put(\"{0}\",new Integer(answer));\n"
-              + "return answer;";
+          return "int answer = {0}();\ncache.put(\"{0}\",new Integer(answer));\nreturn answer;";
         }
       };
 
@@ -149,9 +105,7 @@ class ConstantsWithLookupImplCreator extends ConstantsImplCreator {
       LookupMethodCreator floatMethod = new LookupMethodCreator(this, floatType) {
         @Override
         public String returnTemplate() {
-          String val = "float answer = {0}();\n"
-              + "cache.put(\"{0}\", new Float(answer));\n"
-              + "return answer;";
+          String val = "float answer = {0}();\ncache.put(\"{0}\", new Float(answer));\nreturn answer;";
           return val;
         }
 
@@ -178,9 +132,7 @@ class ConstantsWithLookupImplCreator extends ConstantsImplCreator {
           stringType) {
         @Override
         public String returnTemplate() {
-          return "String answer = {0}();\n"
-              + "cache.put(\"{0}\",answer);\n"
-              + "return answer;";
+          return "String answer = {0}();\ncache.put(\"{0}\",answer);\nreturn answer;";
         }
       };
       namesToMethodCreators.put("getString", stringMethod);
@@ -197,12 +149,6 @@ class ConstantsWithLookupImplCreator extends ConstantsImplCreator {
     }
   }
 
-  @Override
-  protected void classEpilog() {
-    createNeededPartitionLookups();
-    super.classEpilog();
-  }
-
   /**
    * Create the method body associated with the given method. Arguments are
    * arg0...argN.
@@ -213,76 +159,14 @@ class ConstantsWithLookupImplCreator extends ConstantsImplCreator {
     checkMethod(logger, method);
     if (method.getParameters().length == 1) {
       String name = method.getName();
-      LookupMethodCreator c = getLookupMethodCreator(name);
+      AbstractMethodCreator c = namesToMethodCreators.get(name);
       if (c != null) {
-        createMethodWithPartitionCheckFor(c, method);
+        c.createMethodFor(logger, method, name, null, locale);
         return;
       }
     }
     // fall through
     super.emitMethodBody(logger, method, locale);
-  }
-
-  void addNeededPartitionLookups(JMethod targetMethod,
-      List<List<JMethod>> methodToCreatePartitionLookups) {
-    neededPartitionLookups.put(targetMethod, methodToCreatePartitionLookups);
-  }
-
-  void createMethodWithPartitionCheckFor(LookupMethodCreator methodCreator, JMethod targetMethod) {
-    List<List<JMethod>> methodPartitions = findMethodsToCreateWithPartitionSize(targetMethod,
-        methodCreator.getReturnType());
-
-    String nextPartitionMethod = null;
-    final List<List<JMethod>> methodToCreatePartitionLookups;
-    final List<JMethod> methodsToCreate;
-    if (methodPartitions.size() > 1) {
-      nextPartitionMethod = createPartitionMethodName(targetMethod, 0);
-      methodsToCreate = methodPartitions.get(0);
-      methodToCreatePartitionLookups = methodPartitions.subList(1, methodPartitions.size());
-    } else {
-      methodsToCreate = methodPartitions.isEmpty() ? Collections.<JMethod> emptyList()
-          : methodPartitions.get(0);
-      methodToCreatePartitionLookups = Collections.emptyList();
-    }
-    addNeededPartitionLookups(targetMethod, methodToCreatePartitionLookups);
-    methodCreator.createCacheLookupFor();
-    methodCreator.createMethodFor(targetMethod, methodsToCreate, nextPartitionMethod);
-  }
-
-  String createPartitionMethodName(JMethod targetMethod, int partitionIndex) {
-    final String templatePartitionMethodName = "{0}FromPartition{1}";
-    return MessageFormat.format(templatePartitionMethodName, new Object[] {
-        targetMethod.getName(), partitionIndex});
-  }
-
-  List<JMethod> findAllMethodsToCreate(JMethod targetMethod, JType methodReturnType) {
-    JMethod[] allMethods = allInterfaceMethods;
-    JType erasedType = methodReturnType.getErasedType();
-    List<JMethod> methodsToCreate = new ArrayList<>();
-    for (JMethod methodToCheck : allMethods) {
-      if (methodToCheck.getReturnType().getErasedType().equals(erasedType)
-          && methodToCheck != targetMethod) {
-        methodsToCreate.add(methodToCheck);
-      }
-    }
-    return methodsToCreate;
-  }
-
-  List<List<JMethod>> findMethodsToCreateWithPartitionSize(JMethod targetMethod,
-      JType methodReturnType) {
-    List<JMethod> allMethodsToCreate = findAllMethodsToCreate(targetMethod, methodReturnType);
-    return Lists.partition(allMethodsToCreate, partitionsSize);
-  }
-
-  LookupMethodCreator getLookupMethodCreator(String name) {
-    return namesToMethodCreators.get(name);
-  }
-
-  /**
-   * Visible for testing only.
-   */
-  Map<JMethod, List<List<JMethod>>> getNeededPartitionLookups() {
-    return neededPartitionLookups;
   }
 
   /**
@@ -293,7 +177,7 @@ class ConstantsWithLookupImplCreator extends ConstantsImplCreator {
    */
   private void checkMethod(TreeLogger logger, JMethod method)
       throws UnableToCompleteException {
-    if (getLookupMethodCreator(method.getName()) != null) {
+    if (namesToMethodCreators.get(method.getName()) != null) {
       JParameter[] params = method.getParameters();
       // user may have specified a method named getInt/etc with no parameters
       // this isn't a conflict, so treat them like any other Constant methods
@@ -309,28 +193,6 @@ class ConstantsWithLookupImplCreator extends ConstantsImplCreator {
       }
     } else {
       checkConstantMethod(logger, method);
-    }
-  }
-
-  private void createNeededPartitionLookups() {
-    for (Entry<JMethod, List<List<JMethod>>> neededPartitionLookup : 
-      neededPartitionLookups.entrySet()) {
-      JMethod targetMethod = neededPartitionLookup.getKey();
-      LookupMethodCreator lookupMethodCreator = getLookupMethodCreator(targetMethod.getName());
-      List<List<JMethod>> methodForPartitionLookups = neededPartitionLookup.getValue();
-      int partitionStartIndex = 0;
-      Iterator<List<JMethod>> neededPartitionIterator = methodForPartitionLookups.iterator();
-      while (neededPartitionIterator.hasNext()) {
-        String currentPartitionLookupMethodName = createPartitionMethodName(targetMethod,
-            partitionStartIndex++);
-        List<JMethod> methodsToCreate = neededPartitionIterator.next();
-        String nextPartitionMethod = null;
-        if (neededPartitionIterator.hasNext()) {
-          nextPartitionMethod = createPartitionMethodName(targetMethod, partitionStartIndex);
-        }
-        lookupMethodCreator.createPartitionLookup(currentPartitionLookupMethodName, targetMethod,
-            methodsToCreate, nextPartitionMethod);
-      }
     }
   }
 }
