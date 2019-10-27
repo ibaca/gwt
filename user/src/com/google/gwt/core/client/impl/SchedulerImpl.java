@@ -1,12 +1,12 @@
 /*
  * Copyright 2009 Google Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -160,7 +160,7 @@ public class SchedulerImpl extends Scheduler {
    * that want to repeat will be pushed onto the <code>rescheduled</code> queue.
    * The contents of <code>tasks</code> may not be altered while this method is
    * executing.
-   * 
+   *
    * @return <code>rescheduled</code> or a newly-allocated array if
    *         <code>rescheduled</code> is null.
    */
@@ -298,14 +298,33 @@ public class SchedulerImpl extends Scheduler {
     entryCommands = push(entryCommands, Task.create(cmd));
   }
 
+  private static int finallyTaskId = 0;
+
+  private static void finallyTaskRun() {
+    finallyTaskId = 0;
+    SchedulerImpl.INSTANCE.flushFinallyCommands();
+  }
+
+  private static native int finallyTaskSchedule() /*-{
+    return $wnd.setTimeout(@SchedulerImpl::finallyTaskRun(), 0);
+  }-*/;
+
+  private static void finallyTaskScheduleIfNotOnEntryStack() {
+    if (!Impl.isEntryOnStack() && finallyTaskId == 0) {
+      finallyTaskId = finallyTaskSchedule();
+    }
+  }
+
   @Override
   public void scheduleFinally(RepeatingCommand cmd) {
     finallyCommands = push(finallyCommands, Task.create(cmd));
+    finallyTaskScheduleIfNotOnEntryStack();
   }
 
   @Override
   public void scheduleFinally(ScheduledCommand cmd) {
     finallyCommands = push(finallyCommands, Task.create(cmd));
+    finallyTaskScheduleIfNotOnEntryStack();
   }
 
   @Override
