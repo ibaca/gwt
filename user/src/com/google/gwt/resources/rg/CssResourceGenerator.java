@@ -121,8 +121,8 @@ public class CssResourceGenerator extends AbstractCssResourceGenerator
    * {@link #makeIdent} if they conflict with reserved class-name prefixes.
    */
   static final char[] BASE32_CHARS = new char[] {
-      'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
-      'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', '-', '0', '1',
+      'Y', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
+      'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', '6', '-', '0', '1',
       '2', '3', '4', '5'};
 
   /**

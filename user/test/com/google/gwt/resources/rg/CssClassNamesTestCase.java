@@ -38,16 +38,16 @@ public class CssClassNamesTestCase extends TestCase {
   private static final int NUM_CYCLES = 1000;
 
   public void testPrefix() {
-    assertEquals("p-A", CssResourceGenerator.computeObfuscatedClassName("p-",
+    assertEquals("p-Y", CssResourceGenerator.computeObfuscatedClassName("p-",
         new Counter(), EMPTY_SET));
   }
 
   public void testReservedPrefixes() {
     Counter counter = new ConstantCounter();
-    SortedSet<String> hateful = new TreeSet<String>(Arrays.asList("a"));
+    SortedSet<String> hateful = new TreeSet<String>(Arrays.asList("Y"));
 
     // Value with no prefixes
-    assertEquals("AB", CssResourceGenerator.computeObfuscatedClassName("",
+    assertEquals("YB", CssResourceGenerator.computeObfuscatedClassName("",
         counter, EMPTY_SET));
 
     assertEquals("CZB", CssResourceGenerator.computeObfuscatedClassName("",
@@ -58,7 +58,7 @@ public class CssClassNamesTestCase extends TestCase {
         counter, hateful));
 
     hateful.add("ezz");
-    assertEquals("KVAZB", CssResourceGenerator.computeObfuscatedClassName("",
+    assertEquals("KVYZB", CssResourceGenerator.computeObfuscatedClassName("",
         counter, hateful));
   }
 

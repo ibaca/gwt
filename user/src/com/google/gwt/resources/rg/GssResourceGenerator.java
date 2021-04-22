@@ -30,6 +30,7 @@ import com.google.gwt.core.ext.typeinfo.JType;
 import com.google.gwt.core.ext.typeinfo.NotFoundException;
 import com.google.gwt.core.ext.typeinfo.TypeOracle;
 import com.google.gwt.dev.util.Util;
+import com.google.gwt.dev.util.collect.Sets;
 import com.google.gwt.i18n.client.LocaleInfo;
 import com.google.gwt.resources.client.ClientBundle.Source;
 import com.google.gwt.resources.client.CssResource;
@@ -430,8 +431,8 @@ public class GssResourceGenerator extends AbstractCssResourceGenerator implement
   private static final String KEY_HAS_CACHED_DATA = "hasCachedData";
   private static final String KEY_SHARED_METHODS = "sharedMethods";
   private static final char[] BASE32_CHARS = new char[]{
-      'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
-      'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', '0', '1',
+      'Y', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
+      'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', '7', '0', '1',
       '2', '3', '4', '5', '6'};
   // We follow CSS specification to detect the charset:
   // - Authors using an @charset rule must place the rule at the very beginning of the style sheet,
@@ -1449,6 +1450,9 @@ public class GssResourceGenerator extends AbstractCssResourceGenerator implement
     return replacementsWithPrefix;
   }
 
+  private static final Set<String> OBF_CSS_BLACKLIST = Sets.create("ad", "Ad", "aD", "AD",
+          "ads", "Ads", "aDs", "adS", "ADs", "aDS", "ADS");
+
   private Map<String, String> computeReplacementsForType(JClassType cssResource) {
     Map<String, String> replacements = replacementsByClassAndMethod.get(cssResource);
 
@@ -1461,7 +1465,7 @@ public class GssResourceGenerator extends AbstractCssResourceGenerator implement
       // This substitution map will prefix each renamed class with the resource prefix and use a
       // MinimalSubstitutionMap for computing the obfuscated name.
       SubstitutionMap prefixingSubstitutionMap = new PrefixingSubstitutionMap(
-          new MinimalSubstitutionMap(), obfuscationPrefix + resourcePrefix + "-");
+          new MinimalSubstitutionMap(OBF_CSS_BLACKLIST), obfuscationPrefix + resourcePrefix + "-");
 
       for (JMethod method : cssResource.getOverridableMethods()) {
         if (method == getNameMethod || method == getTextMethod || method == ensuredInjectedMethod) {
